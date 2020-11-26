@@ -1,5 +1,5 @@
 [package]
-name = "ddlogger"
+name = "dwade"
 version = "0.1.0"
 authors = ["Michał Krawczyk <krawczyk.michal93@gmail.com>"]
 edition = "2018"
@@ -8,4 +8,3 @@ edition = "2018"
 debug_mode = []
 
 [dependencies]
-

@@ -1,3 +1,4 @@
+use chrono::prelude::Local;
 use std::fmt;
 use std::io::Write;
 
@@ -28,14 +29,23 @@ impl Logger {
 
     /*     fn remove_output(&mut self, index: u8) -> (String, Box<dyn Write>) {}
      */
-
     pub fn log(&mut self, level: Level, args: fmt::Arguments) {
         if level as i32 > self.level as i32 {
             return;
         }
 
-        for o in &mut self.outputs {
-            writeln!(o, "{}", args);
+        let now = Local::now();
+        for (out, name) in self.outputs.iter_mut().zip(self.lognames.iter()) {
+            match writeln!(
+                out,
+                "[{}.{}] {}",
+                now.format("%H:%M:%S"),
+                now.timestamp_subsec_millis(),
+                args
+            ) {
+                Ok(_) => {}
+                Err(err) => eprintln!("Failed to write to the output: {}.\n Error: {}", name, err),
+            };
         }
     }
 }
@@ -55,36 +65,36 @@ pub enum Level {
 // ********** Level specific **********
 #[macro_export]
 #[cfg(feature = "debug_logs")]
-macro_rules! ddlog_debug {
-	( $logger:expr, $( $args:expr ),* ) => {
-	    $logger.log(dwade::log::Level::Debug, format_args!($( $args, )*));
+macro_rules! debug {
+	( $logger:expr, $fmt:expr $(, $args:expr )* ) => {
+	    $logger.log($crate::log::Level::Debug, format_args!($fmt $(, $args)*));
 	};
 }
 
 #[macro_export]
 #[cfg(not(feature = "debug_logs"))]
-macro_rules! ddlog_debug {
-    ( $logger:expr, $( $args:expr ),* ) => {};
+macro_rules! debug {
+    ( $( $_:expr ),*) => {};
 }
 
 #[macro_export]
-macro_rules! ddlog_info {
-	( $logger:expr, $( $args:expr ),* ) => {
-	    $logger.log(dwade::log::Level::Info, format_args!($( $args, )*));
+macro_rules! info {
+	( $logger:expr, $fmt:expr $(, $args:expr )* ) => {
+	    $logger.log($crate::log::Level::Info, format_args!($fmt $(, $args )*));
 	};
 }
 
 #[macro_export]
-macro_rules! ddlog_warn {
-	( $logger:expr, $( $args:expr ),* ) => {
-	    $logger.log(dwade::log::Level::Warning, format_args!($( $args, )*));
-	};
+macro_rules! warn {
+	( $logger:expr, $fmt:expr $(, $args:expr )* ) => {
+	    $logger.log($crate::log::Level::Warning, format_args!($fmt $(, $args )*));
+    };
 }
 
 #[macro_export]
-macro_rules! ddlog_error {
+macro_rules! error {
     ( $logger:expr, $fmt:expr $(, $args:expr )* ) => {
-        $logger.log(dwade::log::Level::Error, format_args!($fmt $(, $args )*));
+        $logger.log($crate::log::Level::Error, format_args!($fmt $(, $args )*));
     };
 }
 

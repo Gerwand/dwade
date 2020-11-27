@@ -5,6 +5,8 @@ authors = ["Michał Krawczyk <krawczyk.michal93@gmail.com>"]
 edition = "2018"
 
 [features]
-debug_mode = []
+default = ["debug_logs"]
+debug_logs = []
 
 [dependencies]
+chrono = "0.4"

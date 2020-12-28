@@ -1,12 +1,16 @@
 use chrono::prelude::Local;
 use std::fmt;
-use std::io::Write;
+use std::io;
+
+pub trait LogOutput {
+    fn log(&mut self, msg: &str) -> io::Result<()>;
+    fn format(&mut self, lvl: Level);
+    fn name(&self) -> &str;
+}
 
 pub struct Logger {
     level: Level,
-    // Let's keep the output and logname separated, to keep the cache smaller.
-    outputs: Vec<Box<dyn Write>>,
-    lognames: Vec<String>,
+    outputs: Vec<Box<dyn LogOutput>>,
 }
 
 impl Logger {
@@ -14,7 +18,6 @@ impl Logger {
         Logger {
             level: Level::Warning,
             outputs: vec![],
-            lognames: vec![],
         }
     }
 
@@ -22,9 +25,8 @@ impl Logger {
         self.level = level;
     }
 
-    pub fn add_output(&mut self, name: String, output: Box<dyn Write>) {
-        self.lognames.push(name);
-        self.outputs.push(output);
+    pub fn add_output(&mut self, log: Box<dyn LogOutput>) {
+        self.outputs.push(log);
     }
 
     /*     fn remove_output(&mut self, index: u8) -> (String, Box<dyn Write>) {}
@@ -34,17 +36,26 @@ impl Logger {
             return;
         }
 
+        if self.outputs.is_empty() {
+            return;
+        }
+
         let now = Local::now();
-        for (out, name) in self.outputs.iter_mut().zip(self.lognames.iter()) {
-            match writeln!(
-                out,
-                "[{}.{}] {}",
-                now.format("%H:%M:%S"),
-                now.timestamp_subsec_millis(),
-                args
-            ) {
+        let string = format!(
+            "[{}.{}] {}",
+            now.format("%H:%M:%S"),
+            now.timestamp_subsec_millis(),
+            args
+        );
+        for out in self.outputs.iter_mut() {
+            out.format(level);
+            match out.log(&string[..]) {
                 Ok(_) => {}
-                Err(err) => eprintln!("Failed to write to the output: {}.\n Error: {}", name, err),
+                Err(err) => eprintln!(
+                    "Failed to write to the output: {}.\n Error: {}",
+                    out.name(),
+                    err
+                ),
             };
         }
     }
@@ -108,5 +119,67 @@ mod tests {
         let logger = Logger::new();
         assert_eq!(logger.level as i32, Level::Warning as i32);
         assert_eq!(logger.outputs.is_empty(), true);
+    }
+}
+
+pub mod console {
+    use super::*;
+    use std::io::{self, Write};
+
+    pub struct ConsoleLog {
+        stdout: io::Stdout,
+    }
+
+    impl ConsoleLog {
+        pub fn new() -> ConsoleLog {
+            ConsoleLog {
+                stdout: io::stdout(),
+            }
+        }
+    }
+
+    impl LogOutput for ConsoleLog {
+        fn log(&mut self, msg: &str) -> io::Result<()> {
+            writeln!(self.stdout, "{}", msg)
+        }
+
+        fn name(&self) -> &str {
+            "Terminal log"
+        }
+
+        fn format(&mut self, _lvl: Level) {}
+    }
+}
+
+pub mod file {
+    use super::*;
+    use std::fs::File;
+    use std::io::{self, Write};
+
+    pub struct FileLog {
+        file: File,
+        name: String,
+    }
+
+    impl FileLog {
+        pub fn new(filename: &str) -> io::Result<FileLog> {
+            let file = File::create(filename)?;
+            Ok(FileLog {
+                file,
+                name: String::from(filename),
+            })
+        }
+    }
+
+    impl LogOutput for FileLog {
+        fn log(&mut self, msg: &str) -> io::Result<()> {
+            writeln!(self.file, "{}", msg)
+        }
+
+        fn name(&self) -> &str {
+            &self.name[..]
+        }
+
+        fn format(&mut self, _lvl: Level) {}
     }
 }

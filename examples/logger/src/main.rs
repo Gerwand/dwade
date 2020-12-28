@@ -1,16 +1,14 @@
+use dwade::log::console::ConsoleLog;
+use dwade::log::file::FileLog;
 use dwade::log::{self, Logger};
 use dwade::{debug, error, info, warn};
-use std::fs::File;
-
-use std::io;
 
 fn main() {
     let mut logger = Logger::new();
-    logger.add_output(String::from("stdout"), Box::new(io::stdout()));
+    logger.add_output(Box::new(ConsoleLog::new()));
 
-    let log_file =
-        Box::new(File::create("logger_test.log").expect("Failed to create logger file."));
-    logger.add_output(String::from("file"), log_file);
+    let log_file = FileLog::new("logger_test.log").expect("Failed to create log file");
+    logger.add_output(Box::new(log_file));
 
     println!("Default logging lvl");
     error!(logger, "## Error log!");
